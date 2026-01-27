@@ -15,7 +15,7 @@ async function requireUserId() {
 
 export async function PATCH(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const userId = await requireUserId()
   if (!userId) {
@@ -25,7 +25,8 @@ export async function PATCH(
   const body = await request.json().catch(() => ({}))
   const completed = Boolean(body.completed)
 
-  if (!ObjectId.isValid(params.id)) {
+  const { id } = await params
+  if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Invalid task id." }, { status: 400 })
   }
 
@@ -33,7 +34,7 @@ export async function PATCH(
   const db = await getDb()
   const result = await db.collection("tasks").findOneAndUpdate(
     {
-      _id: new ObjectId(params.id),
+      _id: new ObjectId(id),
       userId: new ObjectId(userId),
     },
     { $set: { completed } },
@@ -56,21 +57,22 @@ export async function PATCH(
 
 export async function DELETE(
   _request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const userId = await requireUserId()
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  if (!ObjectId.isValid(params.id)) {
+  const { id } = await params
+  if (!ObjectId.isValid(id)) {
     return NextResponse.json({ error: "Invalid task id." }, { status: 400 })
   }
 
   await ensureUserIndexes()
   const db = await getDb()
   const result = await db.collection("tasks").deleteOne({
-    _id: new ObjectId(params.id),
+    _id: new ObjectId(id),
     userId: new ObjectId(userId),
   })
 
