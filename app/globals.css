@@ -107,3 +107,32 @@
     @apply bg-background text-foreground;
   }
 }
+
+@keyframes activity-bg {
+  0% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.25;
+  }
+}
+
+.activity-bg {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+}
+
+.activity-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: var(--activity-bg);
+  animation: activity-bg 3s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
+}

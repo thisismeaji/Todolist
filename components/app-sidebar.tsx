@@ -1,15 +1,12 @@
 "use client"
 
 import * as React from "react"
-import {
-  BookOpen,
-  Bot,
-  Command,
-  SquareTerminal,
-} from "lucide-react"
+import { Command } from "lucide-react"
+import Link from "next/link"
 
 import { NavMain } from "@/components/nav-main"
 import { NavUser } from "@/components/nav-user"
+import { dashboardNavItems } from "@/components/dashboard-nav"
 import {
   Sidebar,
   SidebarContent,
@@ -19,27 +16,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-
-const data = {
-  navMain: [
-    {
-      title: "Overview",
-      url: "/dashboard",
-      icon: SquareTerminal,
-      isActive: true,
-    },
-    {
-      title: "Task List",
-      url: "/dashboard/tasks",
-      icon: Bot,
-    },
-    {
-      title: "Progress",
-      url: "/dashboard/progress",
-      icon: BookOpen,
-    },
-  ],
-}
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   user: {
@@ -56,7 +32,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
-              <a href="#">
+              <Link href="#">
                 <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
                   <Command className="size-4" />
                 </div>
@@ -64,13 +40,13 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
                   <span className="truncate font-medium">Acme Inc</span>
                   <span className="truncate text-xs">Enterprise</span>
                 </div>
-              </a>
+              </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={dashboardNavItems} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} />

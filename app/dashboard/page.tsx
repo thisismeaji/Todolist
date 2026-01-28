@@ -1,96 +1,163 @@
-import { AppSidebar } from "@/components/app-sidebar"
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
-import { cookies } from "next/headers"
-import { redirect } from "next/navigation"
-import { verifyAuthToken } from "@/lib/auth"
-import { getDb } from "@/lib/db"
-import { ObjectId } from "mongodb"
-import { TasksPanel } from "@/components/tasks-panel"
+import { DashboardPage } from "@/components/dashboard-page"
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle } from "lucide-react"
+import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { SectionCards } from "@/components/section-cards"
+import { TasksTable } from "@/components/tasks-table"
 
 export default async function Page() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get("auth_token")?.value
-  const payload = token ? await verifyAuthToken(token) : null
-
-  if (!payload) {
-    redirect("/login")
-  }
-
-  if (!ObjectId.isValid(payload.sub)) {
-    redirect("/login")
-  }
-
-  const db = await getDb()
-  const user = await db.collection("users").findOne({
-    _id: new ObjectId(payload.sub),
-  })
-
-  if (!user) {
-    redirect("/login")
-  }
-
-  const tasks = await db
-    .collection("tasks")
-    .find({ userId: new ObjectId(payload.sub) })
-    .sort({ createdAt: -1 })
-    .limit(50)
-    .toArray()
-
-  const initialTasks = tasks.map((task) => ({
-    id: task._id.toString(),
-    title: task.title,
-    completed: task.completed,
-    createdAt: task.createdAt,
-  }))
-
   return (
-    <SidebarProvider>
-      <AppSidebar
-        user={{
-          name: user.name || user.email?.split("@")[0] || "User",
-          email: user.email || "",
-        }}
-      />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator
-              orientation="vertical"
-              className="mr-2 data-[orientation=vertical]:h-4"
-            />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/dashboard">
-                    Productivity
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>Overview</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <TasksPanel initialTasks={initialTasks} />
+    <DashboardPage title="Overview" showBreadcrumbRoot={false}>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+        <div className="flex-1 space-y-4">
+          <ChartAreaInteractive />
+          <SectionCards />
+          <TasksTable />
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+        <aside className="w-full lg:w-full lg:max-w-sm lg:flex-none lg:h-full">
+          <div className="h-full rounded-lg border border-border/60 py-4">
+            <h2 className="text-foreground mb-6 pl-4 text-sm font-semibold tracking-wide">
+              Latest Activity
+            </h2>
+            <div className="relative pl-8">
+              <div className="bg-border/70 absolute left-4 top-0 h-full w-px" />
+              <ul className="space-y-4 text-xs">
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" }}
+                    >
+                      <ArrowDownCircle className="text-lime-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        Low priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Update cover image" scheduled.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        2 hours ago
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" }}
+                    >
+                      <MinusCircle className="text-violet-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        Medium priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Finalize task board" in progress.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        5 hours ago
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" }}
+                    >
+                      <ArrowUpCircle className="text-red-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        High priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Client onboarding" blocked.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Yesterday
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" }}
+                    >
+                      <ArrowDownCircle className="text-lime-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        Low priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Clean up backlog" added.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        3 hours ago
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" }}
+                    >
+                      <MinusCircle className="text-violet-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        Medium priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Sprint review" scheduled.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        1 day ago
+                      </p>
+                    </div>
+                  </div>
+                </li>
+                <li className="relative">
+                  <span className="bg-border/70 absolute -left-4 top-4 h-px w-4" />
+                  <div className="flex items-start gap-3">
+                    <span
+                      className="activity-bg flex size-8 items-center justify-center rounded-full"
+                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" }}
+                    >
+                      <ArrowUpCircle className="text-red-600 relative z-10 size-4" />
+                    </span>
+                    <div>
+                      <p className="text-foreground text-xs font-semibold tracking-wide mb-1">
+                        High priority
+                      </p>
+                      <p className="text-muted-foreground">
+                        "Release checklist" overdue.
+                      </p>
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        2 days ago
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </DashboardPage>
   )
 }
