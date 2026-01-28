@@ -41,7 +41,7 @@ export async function PATCH(
     { returnDocument: "after" }
   )
 
-  if (!result.value) {
+  if (!result || !result.value) {
     return NextResponse.json({ error: "Task tidak ditemukan." }, { status: 404 })
   }
 

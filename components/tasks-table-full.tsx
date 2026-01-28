@@ -7,24 +7,12 @@ import {
   Circle,
   Clock,
   MinusCircle,
-  MoreVertical,
   Plus,
   SlidersHorizontal,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -109,9 +97,6 @@ const rows = [
   },
 ]
 
-const statusOptions = ["Todo", "In Progress", "Done"] as const
-const priorityOptions = ["Low", "Medium", "High"] as const
-
 const statusIcon = {
   Todo: {
     Icon: Circle,
@@ -181,7 +166,6 @@ export function TasksTableFull() {
             <TableHead>Title</TableHead>
             <TableHead className="w-40">Status</TableHead>
             <TableHead className="w-32">Priority</TableHead>
-            <TableHead className="w-10" />
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -220,67 +204,6 @@ export function TasksTableFull() {
                     </span>
                     <span>{row.priority}</span>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon-sm">
-                        <MoreVertical className="size-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent
-                      align="end"
-                      className="bg-background w-44"
-                    >
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Status</DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="bg-background w-40">
-                          {statusOptions.map((status) => (
-                            <DropdownMenuItem
-                              key={status}
-                              className={
-                                status === row.status ? "font-semibold" : undefined
-                              }
-                            >
-                              {status}
-                              {status === row.status ? (
-                                <span className="text-muted-foreground ml-auto text-xs">
-                                  ✓
-                                </span>
-                              ) : null}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Priority</DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="bg-background w-40">
-                          {priorityOptions.map((priority) => (
-                            <DropdownMenuItem
-                              key={priority}
-                              className={
-                                priority === row.priority ? "font-semibold" : undefined
-                              }
-                            >
-                              {priority}
-                              {priority === row.priority ? (
-                                <span className="text-muted-foreground ml-auto text-xs">
-                                  ✓
-                                </span>
-                              ) : null}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem variant="destructive">
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             )
