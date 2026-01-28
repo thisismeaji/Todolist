@@ -37,10 +37,10 @@ function ChartContainer({
   children: React.ReactNode
 }) {
   const style = React.useMemo(() => {
-    const next: React.CSSProperties = {}
+    const next = {} as React.CSSProperties
     for (const [key, value] of Object.entries(config)) {
       if (value.color) {
-        next[`--color-${key}` as never] = value.color
+        ;(next as Record<string, string>)[`--color-${key}`] = value.color
       }
     }
     return next
@@ -71,8 +71,8 @@ function ChartTooltipContent({
   indicator = "dot",
 }: {
   active?: boolean
-  payload?: TooltipProps<number, string>["payload"]
-  label?: string
+  payload?: TooltipProps<any, any>["payload"]
+  label?: string | number
   labelFormatter?: (label: string) => React.ReactNode
   indicator?: "dot" | "line"
 }) {
@@ -116,7 +116,8 @@ function ChartTooltipContent({
 }
 
 function ChartLegend({ content, ...props }: LegendProps) {
-  return <Legend content={content} {...props} />
+  const LegendComponent = Legend as React.ComponentType<LegendProps>
+  return <LegendComponent content={content} {...props} />
 }
 
 function ChartLegendContent({

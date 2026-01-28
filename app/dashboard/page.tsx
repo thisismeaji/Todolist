@@ -3,6 +3,7 @@ import { ArrowDownCircle, ArrowUpCircle, MinusCircle } from "lucide-react"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { SectionCards } from "@/components/section-cards"
 import { TasksTable } from "@/components/tasks-table"
+import type { CSSProperties } from "react"
 
 export default async function Page() {
   return (
@@ -26,7 +27,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" } as CSSProperties}
                     >
                       <ArrowDownCircle className="text-lime-600 relative z-10 size-4" />
                     </span>
@@ -48,7 +49,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" } as CSSProperties}
                     >
                       <MinusCircle className="text-violet-600 relative z-10 size-4" />
                     </span>
@@ -70,7 +71,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" } as CSSProperties}
                     >
                       <ArrowUpCircle className="text-red-600 relative z-10 size-4" />
                     </span>
@@ -92,7 +93,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(132, 204, 22, 0.15)" } as CSSProperties}
                     >
                       <ArrowDownCircle className="text-lime-600 relative z-10 size-4" />
                     </span>
@@ -114,7 +115,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(139, 92, 246, 0.15)" } as CSSProperties}
                     >
                       <MinusCircle className="text-violet-600 relative z-10 size-4" />
                     </span>
@@ -136,7 +137,7 @@ export default async function Page() {
                   <div className="flex items-start gap-3">
                     <span
                       className="activity-bg flex size-8 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" }}
+                      style={{ "--activity-bg": "rgba(220, 38, 38, 0.15)" } as CSSProperties}
                     >
                       <ArrowUpCircle className="text-red-600 relative z-10 size-4" />
                     </span>

@@ -1,5 +1,7 @@
 "use client"
 
+import type { CSSProperties } from "react"
+
 import {
   ArrowDownCircle,
   ArrowUpCircle,
@@ -19,7 +21,60 @@ import {
   TableRow,
 } from "@/components/ui/table"
 
-const rows = [
+type TaskStatus = "Todo" | "In Progress" | "Done"
+type TaskPriority = "Low" | "Medium" | "High"
+
+type TaskRow = {
+  id: string
+  type: string
+  title: string
+  status: TaskStatus
+  priority: TaskPriority
+}
+
+const statusIcon: Record<
+  TaskStatus,
+  { Icon: typeof Circle; color: string; bg: string }
+> = {
+  Todo: {
+    Icon: Circle,
+    color: "text-amber-600",
+    bg: "rgba(245, 158, 11, 0.15)",
+  },
+  "In Progress": {
+    Icon: Clock,
+    color: "text-blue-600",
+    bg: "rgba(37, 99, 235, 0.15)",
+  },
+  Done: {
+    Icon: CheckCircle2,
+    color: "text-emerald-600",
+    bg: "rgba(16, 185, 129, 0.15)",
+  },
+}
+
+const priorityIcon: Record<
+  TaskPriority,
+  { Icon: typeof ArrowDownCircle; color: string; bg: string }
+> = {
+  Low: {
+    Icon: ArrowDownCircle,
+    color: "text-lime-600",
+    bg: "rgba(132, 204, 22, 0.15)",
+  },
+  Medium: {
+    Icon: MinusCircle,
+    color: "text-violet-600",
+    bg: "rgba(139, 92, 246, 0.15)",
+  },
+  High: {
+    Icon: ArrowUpCircle,
+    color: "text-red-600",
+    bg: "rgba(220, 38, 38, 0.15)",
+  },
+}
+
+const rows: TaskRow[] = [
   {
     id: "TASK-8782",
     type: "Documentation",
@@ -80,42 +135,6 @@ const rows = [
   },
 ]
 
-const statusIcon = {
-  Todo: {
-    Icon: Circle,
-    color: "text-amber-600",
-    bg: "rgba(245, 158, 11, 0.15)",
-  },
-  "In Progress": {
-    Icon: Clock,
-    color: "text-blue-600",
-    bg: "rgba(37, 99, 235, 0.15)",
-  },
-  Done: {
-    Icon: CheckCircle2,
-    color: "text-emerald-600",
-    bg: "rgba(16, 185, 129, 0.15)",
-  },
-}
-
-const priorityIcon = {
-  Low: {
-    Icon: ArrowDownCircle,
-    color: "text-lime-600",
-    bg: "rgba(132, 204, 22, 0.15)",
-  },
-  Medium: {
-    Icon: MinusCircle,
-    color: "text-violet-600",
-    bg: "rgba(139, 92, 246, 0.15)",
-  },
-  High: {
-    Icon: ArrowUpCircle,
-    color: "text-red-600",
-    bg: "rgba(220, 38, 38, 0.15)",
-  },
-}
-
 export function TasksTable() {
   return (
     <div>
@@ -145,7 +164,7 @@ export function TasksTable() {
                   <div className="flex items-center gap-2">
                     <span
                       className="activity-bg flex size-7 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": statusBg }}
+                      style={{ "--activity-bg": statusBg } as CSSProperties}
                     >
                       <StatusIcon
                         className={`relative z-10 size-4 ${statusColor}`}
@@ -158,7 +177,7 @@ export function TasksTable() {
                   <div className="flex items-center gap-2">
                     <span
                       className="activity-bg flex size-7 items-center justify-center rounded-full"
-                      style={{ "--activity-bg": bg }}
+                      style={{ "--activity-bg": bg } as CSSProperties}
                     >
                       <PriorityIcon className={`relative z-10 size-4 ${color}`} />
                     </span>
