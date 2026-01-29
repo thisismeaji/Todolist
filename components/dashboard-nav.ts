@@ -29,6 +29,11 @@ export const dashboardNavItems = [
     icon: BarChart3,
   },
   {
+    title: "Analytics",
+    url: "/dashboard/analytics",
+    icon: FileText,
+  },
+  {
     title: "Automation",
     url: "/dashboard/automation",
     icon: Settings,

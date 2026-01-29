@@ -30,6 +30,7 @@ type TaskRow = {
   title: string
   status: TaskStatus
   priority: TaskPriority
+  subtasks: { title: string; done: boolean }[]
 }
 
 const statusIcon: Record<
@@ -82,6 +83,11 @@ const rows: TaskRow[] = [
       "You can't compress the program without quantifying the open-source SSD",
     status: "In Progress",
     priority: "Low",
+    subtasks: [
+      { title: "Draft outline", done: true },
+      { title: "Review technical notes", done: false },
+      { title: "Finalize copy", done: false },
+    ],
   },
   {
     id: "TASK-7878",
@@ -90,6 +96,11 @@ const rows: TaskRow[] = [
       "Try to calculate the EXE feed, maybe it will index the multi-byte pixel",
     status: "Todo",
     priority: "Medium",
+    subtasks: [
+      { title: "Collect inputs", done: true },
+      { title: "Run quick check", done: true },
+      { title: "Write summary", done: false },
+    ],
   },
   {
     id: "TASK-7839",
@@ -97,6 +108,11 @@ const rows: TaskRow[] = [
     title: "We need to bypass the neural TCP card",
     status: "Todo",
     priority: "High",
+    subtasks: [
+      { title: "Reproduce issue", done: true },
+      { title: "Identify root cause", done: true },
+      { title: "Add test", done: false },
+    ],
   },
   {
     id: "TASK-5562",
@@ -104,6 +120,10 @@ const rows: TaskRow[] = [
     title: "The SAS interface is down, bypass the open-source pixel",
     status: "In Progress",
     priority: "Low",
+    subtasks: [
+      { title: "List affected areas", done: true },
+      { title: "Update interface", done: false },
+    ],
   },
   {
     id: "TASK-8686",
@@ -111,6 +131,10 @@ const rows: TaskRow[] = [
     title: "I'll parse the wireless SSL protocol, that should drive the API panel",
     status: "Todo",
     priority: "Low",
+    subtasks: [
+      { title: "Define scope", done: true },
+      { title: "Write checklist", done: false },
+    ],
   },
   {
     id: "TASK-1280",
@@ -118,6 +142,10 @@ const rows: TaskRow[] = [
     title: "Use the digital TLS panel, then you can transmit the haptic system",
     status: "Done",
     priority: "High",
+    subtasks: [
+      { title: "Prep assets", done: true },
+      { title: "Verify output", done: true },
+    ],
   },
   {
     id: "TASK-7262",
@@ -125,6 +153,10 @@ const rows: TaskRow[] = [
     title: "The UTF8 application is down, parse the neural bandwidth",
     status: "Done",
     priority: "High",
+    subtasks: [
+      { title: "Check logs", done: true },
+      { title: "Confirm fix", done: true },
+    ],
   },
   {
     id: "TASK-1138",
@@ -132,13 +164,18 @@ const rows: TaskRow[] = [
     title: "Generating the driver won't do anything, we need to quantify the SM",
     status: "In Progress",
     priority: "Low",
+    subtasks: [
+      { title: "Plan steps", done: true },
+      { title: "Execute changes", done: false },
+      { title: "Review result", done: false },
+    ],
   },
 ]
 
 export function TasksTable() {
   return (
-    <div>
-      <Table className="rounded-xl border border-border/60 bg-background">
+    <div className="overflow-x-auto">
+      <Table className="min-w-[640px] rounded-xl border border-border/60 bg-background">
         <TableHeader>
           <TableRow>
             <TableHead className="w-28">Task</TableHead>
@@ -159,6 +196,17 @@ export function TasksTable() {
                   <span className="text-foreground line-clamp-1">
                     {row.title}
                   </span>
+                  <div className="text-muted-foreground mt-1 text-xs">
+                    Subtasks {row.subtasks.filter((item) => item.done).length}/
+                    {row.subtasks.length} ·{" "}
+                    {row.subtasks.slice(0, 2).map((item, index) => (
+                      <span key={item.title}>
+                        {item.title}
+                        {index < 1 ? ", " : ""}
+                      </span>
+                    ))}
+                    {row.subtasks.length > 2 ? "…" : ""}
+                  </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">

@@ -2,19 +2,60 @@ import { DashboardPage } from "@/components/dashboard-page"
 import { ArrowDownCircle, ArrowUpCircle, MinusCircle } from "lucide-react"
 import { ChartAreaInteractive } from "@/components/chart-area-interactive"
 import { SectionCards } from "@/components/section-cards"
-import { TasksTable } from "@/components/tasks-table"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import type { CSSProperties } from "react"
 
 export default async function Page() {
   return (
     <DashboardPage title="Overview" showBreadcrumbRoot={false}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch">
+      <div className="flex flex-col gap-4 [@media(min-width:1650px)]:flex-row [@media(min-width:1650px)]:items-stretch">
         <div className="flex-1 space-y-4">
           <ChartAreaInteractive />
           <SectionCards />
-          <TasksTable />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card className="bg-background">
+              <CardHeader>
+                <CardTitle>Upcoming</CardTitle>
+                <CardDescription>Tasks due soon</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Finalize task board</span>
+                  <span className="text-muted-foreground">Today</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Update cover image</span>
+                  <span className="text-muted-foreground">Tomorrow</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Release checklist</span>
+                  <span className="text-muted-foreground">Fri</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="bg-background">
+              <CardHeader>
+                <CardTitle>Focus</CardTitle>
+                <CardDescription>Today’s top priorities</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Client onboarding</span>
+                  <span className="text-muted-foreground">High</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Clean up backlog</span>
+                  <span className="text-muted-foreground">Medium</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-foreground">Sprint review</span>
+                  <span className="text-muted-foreground">Medium</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-        <aside className="w-full lg:w-full lg:max-w-sm lg:flex-none lg:h-full">
+        <aside className="w-full [@media(min-width:1650px)]:w-full [@media(min-width:1650px)]:max-w-sm [@media(min-width:1650px)]:flex-none [@media(min-width:1650px)]:h-full">
           <div className="h-full rounded-lg border border-border/60 py-4">
             <h2 className="text-foreground mb-6 pl-4 text-sm font-semibold tracking-wide">
               Latest Activity

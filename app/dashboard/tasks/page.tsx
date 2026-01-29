@@ -1,10 +1,12 @@
 import { DashboardPage } from "@/components/dashboard-page"
-import { TasksTableFull } from "@/components/tasks-table-full"
+import { TasksTableClient } from "@/components/tasks-table-client"
 
 export default async function Page() {
   return (
     <DashboardPage title="Tasks">
-      <TasksTableFull />
+      <div className="w-full min-w-0 max-w-full overflow-x-hidden">
+        <TasksTableClient />
+      </div>
     </DashboardPage>
   )
 }

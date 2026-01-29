@@ -14,7 +14,7 @@ import {
 
 export function SectionCards() {
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <Card className="@container/card bg-background border-border/60 shadow-none">
         <CardHeader>
           <CardDescription className="text-xs">Tasks Completed</CardDescription>

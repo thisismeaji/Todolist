@@ -52,7 +52,7 @@ export function SearchPanel() {
     return (
       <button
         type="button"
-        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full max-w-[250px] items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition sm:max-w-sm focus-visible:ring-[3px] focus-visible:outline-none"
+        className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full max-w-[250px] items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition [@media(min-width:1650px)]:max-w-sm focus-visible:ring-[3px] focus-visible:outline-none"
         aria-label="Search"
       >
         <Search className="size-4" />
@@ -67,7 +67,7 @@ export function SearchPanel() {
       <Dialog.Trigger asChild>
         <button
           type="button"
-          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full max-w-[250px] items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition sm:max-w-sm focus-visible:ring-[3px] focus-visible:outline-none"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex w-full max-w-[250px] items-center gap-2 rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs transition [@media(min-width:1650px)]:max-w-sm focus-visible:ring-[3px] focus-visible:outline-none"
           aria-label="Open search"
         >
           <Search className="size-4" />
