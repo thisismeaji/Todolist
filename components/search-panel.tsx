@@ -19,7 +19,7 @@ export function SearchPanel() {
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
-      const key = event.key.toLowerCase()
+      const key = typeof event.key === "string" ? event.key.toLowerCase() : ""
       if ((event.ctrlKey || event.metaKey) && key === "k") {
         event.preventDefault()
         if (mounted) {

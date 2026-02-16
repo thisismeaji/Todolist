@@ -1,7 +1,9 @@
 "use client"
 
 import type { CSSProperties } from "react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { toast } from "sonner"
+import { format } from "date-fns"
 
 import {
   ArrowDownCircle,
@@ -17,10 +19,12 @@ import {
   MinusCircle,
   Plus,
   SlidersHorizontal,
+  X,
 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Calendar } from "@/components/ui/calendar"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,6 +36,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
 import {
   Select,
   SelectContent,
@@ -64,6 +80,68 @@ type TaskRow = {
   subtasks: { title: string; done: boolean }[]
   recurring: string | null
   dependsOn: string[]
+}
+
+type ApiTask = {
+  id: string
+  title: string
+  completed: boolean
+  createdAt: string | Date
+  updatedAt?: string | Date
+  status?: TaskStatus
+  priority?: TaskPriority
+  dueDate?: string | null
+  reminderAt?: string | null
+}
+
+function formatIsoDate(input: string | Date) {
+  const date = input instanceof Date ? input : new Date(input)
+  if (Number.isNaN(date.getTime())) return ""
+  return date.toISOString().slice(0, 10)
+}
+
+function formatDateTimeValue(value?: string | null) {
+  if (!value) return ""
+  return value.replace("T", " ")
+}
+
+function formatDateOnlyValue(value?: string | null) {
+  if (!value) return ""
+  return value
+}
+
+function toDateOnlyString(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+function toDateTimeLocalString(date: Date, time: string) {
+  const datePart = toDateOnlyString(date)
+  const safeTime = /^\d{2}:\d{2}$/.test(time) ? time : "09:00"
+  return `${datePart}T${safeTime}`
+}
+
+function apiTaskToRow(task: ApiTask): TaskRow {
+  const createdAt = formatIsoDate(task.createdAt)
+  const updatedOn = task.updatedAt ? formatIsoDate(task.updatedAt) : createdAt
+  const status = task.status ?? (task.completed ? "Done" : "Todo")
+  const priority = task.priority ?? "Medium"
+  return {
+    id: task.id,
+    type: "Task",
+    title: task.title,
+    status,
+    priority,
+    createdAt,
+    updatedOn,
+    dueDate: formatDateOnlyValue(task.dueDate),
+    reminderAt: formatDateTimeValue(task.reminderAt),
+    subtasks: [],
+    recurring: null,
+    dependsOn: [],
+  }
 }
 
 const statusIcon: Record<
@@ -108,7 +186,7 @@ const priorityIcon: Record<
   },
 }
 
-const rows: TaskRow[] = [
+const seedRows: TaskRow[] = [
   {
     id: "TASK-8782",
     type: "Documentation",
@@ -296,6 +374,11 @@ const priorityOptions = ["Low", "Medium", "High"] as const
 type PriorityOption = (typeof priorityOptions)[number]
 
 export function TasksTableFull() {
+  const [tasks, setTasks] = useState<ApiTask[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isCreating, setIsCreating] = useState(false)
+  const [pendingIds, setPendingIds] = useState<Set<string>>(() => new Set())
+
   const [query, setQuery] = useState("")
   const [selectedStatuses, setSelectedStatuses] = useState<Set<StatusOption>>(
     () => new Set()
@@ -304,19 +387,238 @@ export function TasksTableFull() {
     Set<PriorityOption>
   >(() => new Set())
 
+  const [isAddOpen, setIsAddOpen] = useState(false)
+  const [keepAdding, setKeepAdding] = useState(false)
+  const [isDuePickerOpen, setIsDuePickerOpen] = useState(false)
+  const [isReminderPickerOpen, setIsReminderPickerOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<
+    { id: string; title: string } | null
+  >(null)
+  const [draft, setDraft] = useState(() => ({
+    title: "",
+    status: "Todo" as TaskStatus,
+    priority: "Medium" as TaskPriority,
+    dueDate: undefined as Date | undefined,
+    reminderDate: undefined as Date | undefined,
+    reminderTime: "",
+  }))
+  const titleInputRef = useRef<HTMLInputElement>(null)
+
+  const rows = useMemo(() => tasks.map(apiTaskToRow), [tasks])
+
   const statusCounts = useMemo(() => {
     return rows.reduce<Record<string, number>>((acc, row) => {
       acc[row.status] = (acc[row.status] ?? 0) + 1
       return acc
     }, {})
-  }, [])
+  }, [rows])
 
   const priorityCounts = useMemo(() => {
     return rows.reduce<Record<string, number>>((acc, row) => {
       acc[row.priority] = (acc[row.priority] ?? 0) + 1
       return acc
     }, {})
+  }, [rows])
+
+  async function refetchTasks() {
+    try {
+      const response = await fetch("/api/tasks", { method: "GET" })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          window.location.href = "/login"
+          return
+        }
+        return
+      }
+
+      setTasks(Array.isArray(data.tasks) ? data.tasks : [])
+    } catch {
+      // Ignore background refresh errors.
+    }
+  }
+
+  useEffect(() => {
+    let isActive = true
+
+    async function load() {
+      try {
+        const response = await fetch("/api/tasks", { method: "GET" })
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          if (response.status === 401) {
+            window.location.href = "/login"
+            return
+          }
+          toast.error(data.error || "Failed to load tasks.")
+          return
+        }
+
+        if (isActive) {
+          setTasks(Array.isArray(data.tasks) ? data.tasks : [])
+        }
+      } catch {
+        toast.error("Failed to load tasks.")
+      } finally {
+        if (isActive) setIsLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      isActive = false
+    }
   }, [])
+
+  useEffect(() => {
+    if (!isAddOpen) return
+    const id = window.setTimeout(() => titleInputRef.current?.focus(), 80)
+    return () => window.clearTimeout(id)
+  }, [isAddOpen])
+
+  async function createTask(payload: {
+    title: string
+    status: TaskStatus
+    priority: TaskPriority
+    dueDate?: string | null
+    reminderAt?: string | null
+  }) {
+    const title = payload.title.trim()
+    if (!title || isCreating) return
+
+    setIsCreating(true)
+    try {
+      const response = await fetch("/api/tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          status: payload.status,
+          priority: payload.priority,
+          dueDate: payload.dueDate ?? null,
+          reminderAt: payload.reminderAt ?? null,
+        }),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to add task.")
+        return
+      }
+
+      setTasks((prev) => [data.task, ...prev])
+      toast.success("Task added.")
+
+      if (keepAdding) {
+        setDraft((prev) => ({ ...prev, title: "" }))
+        window.setTimeout(() => titleInputRef.current?.focus(), 50)
+      } else {
+        setIsAddOpen(false)
+      }
+    } catch {
+      toast.error("Failed to add task.")
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  async function patchTask(
+    taskId: string,
+    update: Partial<{
+      completed: boolean
+      status: TaskStatus
+      priority: TaskPriority
+      dueDate: string | null
+      reminderAt: string | null
+    }>
+  ) {
+    setPendingIds((prev) => new Set(prev).add(taskId))
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(update),
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to update task.")
+        if (response.status === 404) {
+          void refetchTasks()
+        }
+        return
+      }
+
+      if (update.status) {
+        toast.success(`Status updated to ${update.status}.`)
+      } else if (update.priority) {
+        toast.success(`Priority updated to ${update.priority}.`)
+      } else {
+        toast.success("Task updated.")
+      }
+
+      if (data?.task?.id) {
+        const updatedId = String(data.task.id)
+        setTasks((prev) =>
+          prev.map((task) => (task.id === updatedId ? data.task : task))
+        )
+        setPendingIds((prev) => {
+          const next = new Set(prev)
+          next.delete(taskId)
+          next.delete(updatedId)
+          return next
+        })
+      }
+
+      void refetchTasks()
+    } catch {
+      toast.error("Failed to update task.")
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(taskId)
+        return next
+      })
+    }
+  }
+
+  function setTaskStatus(taskId: string, status: TaskStatus) {
+    return patchTask(taskId, { status })
+  }
+
+  function setTaskPriority(taskId: string, priority: TaskPriority) {
+    return patchTask(taskId, { priority })
+  }
+
+  async function deleteTask(taskId: string) {
+    setPendingIds((prev) => new Set(prev).add(taskId))
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: "DELETE",
+      })
+      const data = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to delete task.")
+        return false
+      }
+
+      setTasks((prev) => prev.filter((task) => task.id !== taskId))
+      toast.success("Task deleted.")
+      return true
+    } catch {
+      toast.error("Failed to delete task.")
+      return false
+    } finally {
+      setPendingIds((prev) => {
+        const next = new Set(prev)
+        next.delete(taskId)
+        return next
+      })
+    }
+  }
 
   const filteredRows = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -342,10 +644,56 @@ export function TasksTableFull() {
         row.priority.toLowerCase().includes(q)
       )
     })
-  }, [query, selectedStatuses, selectedPriorities])
+  }, [query, rows, selectedStatuses, selectedPriorities])
 
   return (
     <div className="w-full min-w-0 overflow-x-hidden">
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Delete task?</DialogTitle>
+            <DialogDescription>
+              This action can’t be undone. This will permanently delete{" "}
+              <span className="text-foreground font-medium">
+                {deleteTarget?.title || "this task"}
+              </span>
+              .
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="border-t border-border/60">
+            <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <DialogClose asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={deleteTarget ? pendingIds.has(deleteTarget.id) : false}
+                >
+                  Cancel
+                </Button>
+              </DialogClose>
+              <Button
+                type="button"
+                variant="destructive"
+                disabled={deleteTarget ? pendingIds.has(deleteTarget.id) : true}
+                onClick={async () => {
+                  if (!deleteTarget) return
+                  const ok = await deleteTask(deleteTarget.id)
+                  if (ok) setDeleteTarget(null)
+                }}
+              >
+                {deleteTarget && pendingIds.has(deleteTarget.id)
+                  ? "Deleting..."
+                  : "Delete"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <div className="flex flex-col gap-3 mb-4 min-w-0 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
           <Input
@@ -443,15 +791,371 @@ export function TasksTableFull() {
             </DropdownMenu>
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2">
           <Button variant="outline" size="sm" className="h-9 w-full sm:w-auto">
             <SlidersHorizontal className="size-4" />
             View
           </Button>
-          <Button size="sm" className="h-9 w-full sm:w-auto">
-            <Plus className="size-4" />
-            Add Task
-          </Button>
+          <Dialog
+            open={isAddOpen}
+            onOpenChange={(open) => {
+              setIsAddOpen(open)
+              if (!open) {
+                setDraft({
+                  title: "",
+                  status: "Todo",
+                  priority: "Medium",
+                  dueDate: undefined,
+                  reminderDate: undefined,
+                  reminderTime: "",
+                })
+                setKeepAdding(false)
+                setIsDuePickerOpen(false)
+                setIsReminderPickerOpen(false)
+              }
+            }}
+          >
+            <DialogTrigger asChild>
+              <Button size="sm" className="h-9 w-full sm:w-auto">
+                <Plus className="size-4" />
+                Add Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl">
+              <DialogHeader>
+                <DialogTitle>Add task</DialogTitle>
+                <DialogDescription>
+                  Create a new task quickly without leaving the table.
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                className="flex flex-1 flex-col"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  void createTask({
+                    title: draft.title,
+                    status: draft.status,
+                    priority: draft.priority,
+                    dueDate: draft.dueDate ? toDateOnlyString(draft.dueDate) : null,
+                    reminderAt:
+                      draft.reminderDate && draft.reminderTime
+                        ? toDateTimeLocalString(
+                            draft.reminderDate,
+                            draft.reminderTime
+                          )
+                        : null,
+                  })
+                }}
+              >
+                <div className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden px-4 pb-4">
+                  <div className="min-w-0 flex flex-col gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="new-task-title">Title</Label>
+                      <Input
+                        id="new-task-title"
+                        ref={titleInputRef}
+                        value={draft.title}
+                        onChange={(event) =>
+                          setDraft((prev) => ({ ...prev, title: event.target.value }))
+                        }
+                        placeholder="e.g. Pay electricity bill, finish assignment..."
+                        aria-label="Task title"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Status</Label>
+                        <Select
+                          value={draft.status}
+                          onValueChange={(value) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              status: value as TaskStatus,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="activity-bg flex size-6 items-center justify-center rounded-full"
+                                style={
+                                  {
+                                    "--activity-bg": statusIcon[draft.status].bg,
+                                  } as CSSProperties
+                                }
+                              >
+                                {(() => {
+                                  const { Icon, color } = statusIcon[draft.status]
+                                  return <Icon className={`size-4 ${color}`} />
+                                })()}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-left">
+                                {draft.status}
+                              </span>
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent className="bg-background">
+                            {statusOptions.map((status) => (
+                              <SelectItem
+                                key={status}
+                                value={status}
+                                textValue={status}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span
+                                    className="activity-bg flex size-6 items-center justify-center rounded-full"
+                                    style={
+                                      {
+                                        "--activity-bg": statusIcon[status].bg,
+                                      } as CSSProperties
+                                    }
+                                  >
+                                    {(() => {
+                                      const { Icon, color } = statusIcon[status]
+                                      return <Icon className={`size-4 ${color}`} />
+                                    })()}
+                                  </span>
+                                  <span className="flex-1">{status}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Priority</Label>
+                        <Select
+                          value={draft.priority}
+                          onValueChange={(value) =>
+                            setDraft((prev) => ({
+                              ...prev,
+                              priority: value as TaskPriority,
+                            }))
+                          }
+                        >
+                          <SelectTrigger className="h-9">
+                            <span className="flex min-w-0 items-center gap-2">
+                              <span
+                                className="activity-bg flex size-6 items-center justify-center rounded-full"
+                                style={
+                                  {
+                                    "--activity-bg":
+                                      priorityIcon[draft.priority].bg,
+                                  } as CSSProperties
+                                }
+                              >
+                                {(() => {
+                                  const { Icon, color } = priorityIcon[draft.priority]
+                                  return <Icon className={`size-4 ${color}`} />
+                                })()}
+                              </span>
+                              <span className="min-w-0 flex-1 truncate text-left">
+                                {draft.priority}
+                              </span>
+                            </span>
+                          </SelectTrigger>
+                          <SelectContent className="bg-background">
+                            {priorityOptions.map((priority) => (
+                              <SelectItem
+                                key={priority}
+                                value={priority}
+                                textValue={priority}
+                              >
+                                <span className="flex items-center gap-2">
+                                  <span
+                                    className="activity-bg flex size-6 items-center justify-center rounded-full"
+                                    style={
+                                      {
+                                        "--activity-bg":
+                                          priorityIcon[priority].bg,
+                                      } as CSSProperties
+                                    }
+                                  >
+                                    {(() => {
+                                      const { Icon, color } = priorityIcon[priority]
+                                      return <Icon className={`size-4 ${color}`} />
+                                    })()}
+                                  </span>
+                                  <span className="flex-1">{priority}</span>
+                                </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Due date</Label>
+                        <div className="flex items-center gap-2">
+                          <Popover
+                            open={isDuePickerOpen}
+                            onOpenChange={setIsDuePickerOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-9 min-w-0 flex-1 justify-start font-normal"
+                              >
+                                <span className="min-w-0 flex-1 truncate text-left">
+                                  {draft.dueDate ? (
+                                    format(draft.dueDate, "PPP")
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      Pick a date
+                                    </span>
+                                  )}
+                                </span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={draft.dueDate}
+                                onSelect={(value) => {
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    dueDate: value ?? undefined,
+                                  }))
+                                  if (value) setIsDuePickerOpen(false)
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          {draft.dueDate ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="h-9 w-9"
+                              aria-label="Clear due date"
+                              onClick={() =>
+                                setDraft((prev) => ({ ...prev, dueDate: undefined }))
+                              }
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Reminder</Label>
+                        <div className="flex gap-2">
+                          <Popover
+                            open={isReminderPickerOpen}
+                            onOpenChange={setIsReminderPickerOpen}
+                          >
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="h-9 min-w-0 flex-1 justify-start font-normal"
+                              >
+                                <span className="min-w-0 flex-1 truncate text-left">
+                                  {draft.reminderDate ? (
+                                    format(draft.reminderDate, "PPP")
+                                  ) : (
+                                    <span className="text-muted-foreground">
+                                      Pick a date
+                                    </span>
+                                  )}
+                                </span>
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={draft.reminderDate}
+                                onSelect={(value) => {
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    reminderDate: value ?? undefined,
+                                    reminderTime:
+                                      value && !prev.reminderTime
+                                        ? "09:00"
+                                        : prev.reminderTime,
+                                  }))
+                                  if (value) setIsReminderPickerOpen(false)
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Input
+                            type="time"
+                            className="h-9 w-28"
+                            value={draft.reminderTime}
+                            disabled={!draft.reminderDate}
+                            onChange={(event) =>
+                              setDraft((prev) => ({
+                                ...prev,
+                                reminderTime: event.target.value,
+                              }))
+                            }
+                            aria-label="Reminder time"
+                          />
+                          {draft.reminderDate || draft.reminderTime ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon-xs"
+                              className="h-9 w-9"
+                              aria-label="Clear reminder"
+                              onClick={() =>
+                                setDraft((prev) => ({
+                                  ...prev,
+                                  reminderDate: undefined,
+                                  reminderTime: "",
+                                }))
+                              }
+                            >
+                              <X className="size-4" />
+                            </Button>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 pt-2">
+                      <Checkbox
+                        checked={keepAdding}
+                        onCheckedChange={(value) => setKeepAdding(Boolean(value))}
+                        aria-label="Keep dialog open after saving"
+                      />
+                      <div className="grid gap-0.5">
+                        <p className="text-sm font-medium leading-none">
+                          Keep adding
+                        </p>
+                        <p className="text-muted-foreground text-sm">
+                          After submit, the dialog stays open and the title is cleared.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <DialogFooter className="border-t border-border/60">
+                  <div className="flex w-full flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline" disabled={isCreating}>
+                        Cancel
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="submit"
+                      disabled={isCreating || !draft.title.trim()}
+                    >
+                      {isCreating ? "Adding..." : "Add Task"}
+                    </Button>
+                  </div>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
       <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
@@ -474,20 +1178,32 @@ export function TasksTableFull() {
           </TableRow>
         </TableHeader>
         <TableBody>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={9} className="text-muted-foreground text-center">
+                Loading tasks...
+              </TableCell>
+            </TableRow>
+          ) : null}
           {filteredRows.map((row) => {
             const { Icon: StatusIcon, color: statusColor, bg: statusBg } =
               statusIcon[row.status]
             const { Icon: PriorityIcon, color, bg } = priorityIcon[row.priority]
+            const isPending = pendingIds.has(row.id)
+            const [reminderDate, reminderTime] = row.reminderAt
+              ? row.reminderAt.split(" ")
+              : ["", ""]
             return (
               <TableRow key={row.id}>
                 <TableCell className="font-medium whitespace-nowrap">
-                  {row.id}
+                  {row.id.slice(0, 8)}
                 </TableCell>
                 <TableCell className="min-w-[240px] sm:min-w-[320px]">
                   <span className="text-foreground line-clamp-1">
                     {row.title}
                   </span>
-                  <div className="text-muted-foreground mt-1 text-xs">
+                  {row.subtasks.length > 0 ? (
+                    <div className="text-muted-foreground mt-1 text-xs">
                     Subtasks {row.subtasks.filter((item) => item.done).length}/
                     {row.subtasks.length} ·{" "}
                     {row.subtasks.slice(0, 2).map((item, index) => (
@@ -497,13 +1213,16 @@ export function TasksTableFull() {
                       </span>
                     ))}
                     {row.subtasks.length > 2 ? "…" : ""}
-                  </div>
-                  <div className="text-muted-foreground mt-1 text-xs">
+                    </div>
+                  ) : null}
+                  {row.recurring || row.dependsOn.length > 0 ? (
+                    <div className="text-muted-foreground mt-1 text-xs">
                     {row.recurring ? `Recurring ${row.recurring}` : "One-time"}
                     {row.dependsOn.length > 0
                       ? ` · Depends on ${row.dependsOn.join(", ")}`
                       : ""}
-                  </div>
+                    </div>
+                  ) : null}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
                   {row.createdAt}
@@ -515,7 +1234,18 @@ export function TasksTableFull() {
                   {row.dueDate}
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {row.reminderAt}
+                  {row.reminderAt ? (
+                    <div className="flex flex-col leading-tight">
+                      <span>{reminderDate}</span>
+                      {reminderTime ? (
+                        <span className="text-muted-foreground/80 tabular-nums text-xs">
+                          {reminderTime}
+                        </span>
+                      ) : null}
+                    </div>
+                  ) : (
+                    ""
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -548,22 +1278,63 @@ export function TasksTableFull() {
                         variant="ghost"
                         size="icon-xs"
                         aria-label="Open task actions"
+                        disabled={isPending}
                       >
                         <MoreVertical className="size-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="bg-background">
-                      <DropdownMenuItem>Edit</DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger>Ubah status</DropdownMenuSubTrigger>
+                      <DropdownMenuItem
+                        onSelect={() => {
+                          void setTaskStatus(
+                            row.id,
+                            row.status === "Done" ? "Todo" : "Done"
+                          )
+                        }}
+                      >
+                        {row.status === "Done" ? "Mark as Todo" : "Mark as Done"}
+                      </DropdownMenuItem>
+                    <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Change status</DropdownMenuSubTrigger>
                         <DropdownMenuSubContent className="bg-background">
-                          <DropdownMenuItem>Todo</DropdownMenuItem>
-                          <DropdownMenuItem>In Progress</DropdownMenuItem>
-                          <DropdownMenuItem>Done</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              void setTaskStatus(row.id, "Todo")
+                            }}
+                          >
+                            Todo
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => {
+                              void setTaskStatus(row.id, "In Progress")
+                            }}
+                          >
+                            In Progress
+                          </DropdownMenuItem>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                      <DropdownMenuSub>
+                        <DropdownMenuSubTrigger>Change priority</DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className="bg-background">
+                          {priorityOptions.map((priority) => (
+                            <DropdownMenuItem
+                              key={priority}
+                              onSelect={() => {
+                                void setTaskPriority(row.id, priority)
+                              }}
+                            >
+                              {priority}
+                            </DropdownMenuItem>
+                          ))}
                         </DropdownMenuSubContent>
                       </DropdownMenuSub>
                       <DropdownMenuSeparator />
-                      <DropdownMenuItem variant="destructive">
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onSelect={() => {
+                          setDeleteTarget({ id: row.id, title: row.title })
+                        }}
+                      >
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -572,7 +1343,7 @@ export function TasksTableFull() {
               </TableRow>
             )
           })}
-          {filteredRows.length === 0 ? (
+          {!isLoading && filteredRows.length === 0 ? (
             <TableRow>
               <TableCell colSpan={9} className="text-muted-foreground text-center">
                 No tasks match your filter.
@@ -584,7 +1355,7 @@ export function TasksTableFull() {
       </div>
       <div className="flex flex-col gap-3 border-t border-border/60 p-4 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
         <span>
-          {filteredRows.length} of {rows.length} row(s) shown.
+              {filteredRows.length} of {rows.length} row(s) shown.
         </span>
         <div className="flex flex-wrap items-center gap-3 text-foreground">
           <div className="flex items-center gap-2 text-xs">
@@ -620,4 +1391,3 @@ export function TasksTableFull() {
     </div>
   )
 }
-

@@ -4,6 +4,39 @@ import { ObjectId } from "mongodb"
 import { verifyAuthToken } from "@/lib/auth"
 import { ensureUserIndexes, getDb } from "@/lib/db"
 
+const statusOptions = ["Todo", "In Progress", "Done"] as const
+const priorityOptions = ["Low", "Medium", "High"] as const
+
+type TaskStatus = (typeof statusOptions)[number]
+type TaskPriority = (typeof priorityOptions)[number]
+
+function isTaskStatus(value: unknown): value is TaskStatus {
+  return (
+    typeof value === "string" &&
+    (statusOptions as readonly string[]).includes(value)
+  )
+}
+
+function isTaskPriority(value: unknown): value is TaskPriority {
+  return (
+    typeof value === "string" && (priorityOptions as readonly string[]).includes(value)
+  )
+}
+
+function normalizeDateOnly(value: unknown) {
+  const str = typeof value === "string" ? value.trim() : ""
+  if (str === "") return undefined
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(str)) return null
+  return str
+}
+
+function normalizeDateTimeLocal(value: unknown) {
+  const str = typeof value === "string" ? value.trim() : ""
+  if (str === "") return undefined
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(str)) return null
+  return str
+}
+
 async function requireUserId() {
   const cookieStore = await cookies()
   const token = cookieStore.get("auth_token")?.value
@@ -23,26 +56,109 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => ({}))
-  const completed = Boolean(body.completed)
+
+  const updates: Record<string, unknown> = {}
+
+  if ("title" in body) {
+    const title = String(body.title || "").trim()
+    if (!title) {
+      return NextResponse.json(
+        { error: "Task title is required." },
+        { status: 400 }
+      )
+    }
+    updates.title = title
+  }
+
+  const hasCompleted = typeof body.completed === "boolean"
+  if (hasCompleted) {
+    updates.completed = body.completed
+    updates.status = body.completed ? "Done" : "Todo"
+  }
+
+  if ("status" in body) {
+    if (!isTaskStatus(body.status)) {
+      return NextResponse.json(
+        { error: "Invalid status." },
+        { status: 400 }
+      )
+    }
+    updates.status = body.status
+    updates.completed = body.status === "Done"
+  }
+
+  if ("priority" in body) {
+    if (!isTaskPriority(body.priority)) {
+      return NextResponse.json(
+        { error: "Invalid priority." },
+        { status: 400 }
+      )
+    }
+    updates.priority = body.priority
+  }
+
+  if ("dueDate" in body) {
+    const normalized = normalizeDateOnly(body.dueDate)
+    if (normalized === null) {
+      return NextResponse.json(
+        { error: "Invalid due date format." },
+        { status: 400 }
+      )
+    }
+    if (normalized !== undefined) {
+      updates.dueDate = normalized
+    }
+  }
+
+  if ("reminderAt" in body) {
+    const normalized = normalizeDateTimeLocal(body.reminderAt)
+    if (normalized === null) {
+      return NextResponse.json(
+        { error: "Invalid reminder format." },
+        { status: 400 }
+      )
+    }
+    if (normalized !== undefined) {
+      updates.reminderAt = normalized
+    }
+  }
 
   const { id } = await params
-  if (!ObjectId.isValid(id)) {
-    return NextResponse.json({ error: "Invalid task id." }, { status: 400 })
+  const canUseObjectId = ObjectId.isValid(id)
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json(
+      { error: "No changes to save." },
+      { status: 400 }
+    )
   }
 
   await ensureUserIndexes()
   const db = await getDb()
-  const result = await db.collection("tasks").findOneAndUpdate(
-    {
-      _id: new ObjectId(id),
-      userId: new ObjectId(userId),
-    },
-    { $set: { completed } },
-    { returnDocument: "after" }
-  )
+  updates.updatedAt = new Date()
+
+  const ownerId = new ObjectId(userId)
+  const filters = canUseObjectId
+    ? [
+        { _id: new ObjectId(id), userId: ownerId },
+        { _id: id, userId: ownerId },
+      ]
+    : [{ _id: id, userId: ownerId }]
+
+  let result: any = null
+
+  for (const filter of filters) {
+    // eslint-disable-next-line no-await-in-loop
+    result = await db.collection("tasks").findOneAndUpdate(
+      filter as any,
+      { $set: updates },
+      { returnDocument: "after", includeResultMetadata: true }
+    )
+    if (result?.value) break
+  }
 
   if (!result || !result.value) {
-    return NextResponse.json({ error: "Task tidak ditemukan." }, { status: 404 })
+    return NextResponse.json({ error: "Task not found." }, { status: 404 })
   }
 
   return NextResponse.json({
@@ -51,6 +167,11 @@ export async function PATCH(
       title: result.value.title,
       completed: result.value.completed,
       createdAt: result.value.createdAt,
+      updatedAt: result.value.updatedAt ?? result.value.createdAt,
+      status: result.value.status ?? (result.value.completed ? "Done" : "Todo"),
+      priority: result.value.priority ?? "Medium",
+      dueDate: result.value.dueDate ?? null,
+      reminderAt: result.value.reminderAt ?? null,
     },
   })
 }
@@ -65,19 +186,31 @@ export async function DELETE(
   }
 
   const { id } = await params
-  if (!ObjectId.isValid(id)) {
-    return NextResponse.json({ error: "Invalid task id." }, { status: 400 })
-  }
+  const canUseObjectId = ObjectId.isValid(id)
 
   await ensureUserIndexes()
   const db = await getDb()
-  const result = await db.collection("tasks").deleteOne({
-    _id: new ObjectId(id),
-    userId: new ObjectId(userId),
-  })
+
+  const ownerId = new ObjectId(userId)
+  const filters = canUseObjectId
+    ? [
+        { _id: new ObjectId(id), userId: ownerId },
+        { _id: id, userId: ownerId },
+      ]
+    : [{ _id: id, userId: ownerId }]
+
+  let result = { deletedCount: 0 }
+  for (const filter of filters) {
+    // eslint-disable-next-line no-await-in-loop
+    const attempt = await db.collection("tasks").deleteOne(filter as any)
+    if (attempt.deletedCount) {
+      result = attempt
+      break
+    }
+  }
 
   if (!result.deletedCount) {
-    return NextResponse.json({ error: "Task tidak ditemukan." }, { status: 404 })
+    return NextResponse.json({ error: "Task not found." }, { status: 404 })
   }
 
   return NextResponse.json({ ok: true })

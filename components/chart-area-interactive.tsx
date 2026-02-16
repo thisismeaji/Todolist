@@ -32,6 +32,12 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+export type ProductivityPoint = {
+  date: string
+  completed: number
+  created: number
+}
+
 const chartData = [
   { date: "2024-04-01", completed: 18, created: 22 },
   { date: "2024-04-02", completed: 9, created: 12 },
@@ -137,7 +143,11 @@ const chartConfig = {
   },
 } satisfies ChartConfig
 
-export function ChartAreaInteractive() {
+export function ChartAreaInteractive({
+  data,
+}: {
+  data?: ProductivityPoint[]
+}) {
   const isMobile = useIsMobile()
   const [timeRange, setTimeRange] = React.useState("30d")
 
@@ -147,19 +157,18 @@ export function ChartAreaInteractive() {
     }
   }, [isMobile])
 
-  const filteredData = chartData.filter((item) => {
-    const date = new Date(item.date)
-    const referenceDate = new Date("2024-06-30")
-    let daysToSubtract = 30
-    if (timeRange === "90d") {
-      daysToSubtract = 90
-    } else if (timeRange === "7d") {
-      daysToSubtract = 7
-    }
-    const startDate = new Date(referenceDate)
-    startDate.setDate(startDate.getDate() - daysToSubtract)
-    return date >= startDate
-  })
+  const daysToShow = React.useMemo(() => {
+    if (timeRange === "90d") return 90
+    if (timeRange === "7d") return 7
+    return 30
+  }, [timeRange])
+
+  const sourceData = (data?.length ? data : chartData) as ProductivityPoint[]
+
+  const filteredData = React.useMemo(() => {
+    if (!sourceData.length) return []
+    return sourceData.slice(-daysToShow)
+  }, [sourceData, daysToShow])
 
   return (
     <Card className="@container/card bg-background border-border/60 px-0 shadow-none">
